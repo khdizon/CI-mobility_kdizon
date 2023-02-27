@@ -1,0 +1,73 @@
+starttime = 'YYYY-MM-DD 00:00:00.000000'
+endtime = 'YYYY-MM-DD 23:59:00.000000'
+
+# Using Region 1: Corridor Intersection Details
+intID = 12113 
+
+%%time
+
+query = ("""
+SELECT
+DATETIME(TIMESTAMP(srm.metadata.odeReceivedAt), \"America/Denver\") AS ode_timeStamp,
+  EXTRACT(MINUTE FROM TIMESTAMP(srm.metadata.odeReceivedAt)) AS odeRecMinute,
+  EXTRACT(SECOND FROM TIMESTAMP(srm.metadata.odeReceivedAt)) AS odeRecSecond,
+  EXTRACT(MILLISECOND FROM TIMESTAMP(srm.metadata.odeReceivedAt)) AS odeRecMilliSecond,
+  srm.metadata.originIp as rsuIP,
+  -- requests
+  SignalRequestsList.request.id.id AS IntersectionID, 
+  SignalRequestsList.request.requestID AS RequestID,
+  srm.payload.data.sequenceNumber AS MsgCount,
+  SignalRequestsList.request.requestType AS PriorityRequestType,                                                     
+  SignalRequestsList.request.inBoundLane.lane AS InLaneID,
+  SignalRequestsList.request.outBoundLane.lane AS OutLaneID,
+  -- requestor
+  srm.payload.data.requestor.position.position.latitude AS Lat,
+  srm.payload.data.requestor.position.position.longitude AS Lon,
+  srm.payload.data.requestor.position.heading AS Heading,
+  srm.payload.data.requestor.position.speed.speed AS Velocity  
+FROM
+  cdot-adap-prod.raw_from_rtdh_standard.cv_srm_standard,
+  UNNEST(srm.payload.data.requests.signalRequestPackage) AS SignalRequestsList
+WHERE SignalRequestsList.request.id.id = @intersection_ID
+  AND DATETIME(TIMESTAMP(srm.metadata.odeReceivedAt), \"America/Denver\") BETWEEN @start_time AND @end_time
+ORDER BY ode_timeStamp
+""")
+
+query_params = [ 
+    bigquery.ScalarQueryParameter("intersection_ID", "INT64", intID),
+    bigquery.ScalarQueryParameter("start_time", "STRING", starttime),
+    bigquery.ScalarQueryParameter("end_time", "STRING", endtime)
+]
+
+job_config = bigquery.QueryJobConfig()
+job_config.query_parameters = query_params
+
+
+# execute the query
+srm_raw = client.query(query, job_config=job_config).to_dataframe()
+srm_raw.head()
+
+# Convert the ode_timeStamp column to ode_timemark without the date portion and in milliseconds
+# Note that the resulting values in the "ode_timemark" column are the number of milliseconds since midnight (00:00:00) on each day, 
+# so they do not include the date portion of the original datetime values.
+
+srm_raw['ode_timemark'] = (srm_raw['ode_timeStamp'] - pd.to_datetime(srm_raw['ode_timeStamp'].dt.date)).dt.total_seconds() * 1000
+srm_raw['ode_timemark'] = srm_raw['ode_timemark'].astype(np.int64)
+srm_raw.head()
+
+# View the hourly time SRMs occured
+hourly_srm = srm_raw['ode_timeStamp'].dt.hour
+_= hourly_srm.hist(bins=10)
+
+# Request ID by timestamp
+srm_fig = px.scatter(srm_raw, x='ode_timeStamp', y='MsgCount', color='RequestID',
+                     hover_name='RequestID', hover_data = ['InLaneID', 'OutLaneID'],
+                     title='SRM for 3rd of Jan 2023',
+                     width=800, height=400)
+srm_fig.show()
+print('Duration:', srm_raw['ode_timeStamp'].iloc[-1] - srm_raw['ode_timeStamp'].iloc[0])
+
+
+# Refine to a single CI SRM exchange
+srm_df = srm_raw.loc[srm_raw['RequestID'] <= INPUT]
+srm_df.head()
