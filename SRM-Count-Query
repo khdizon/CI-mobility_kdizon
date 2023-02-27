@@ -1,0 +1,64 @@
+### SRM Count Query
+
+start = 'YYYY-MM-DD'
+end = 'YYYY-MM-DD'
+
+%%time
+
+query = """
+SELECT
+    srm.metadata.originIp AS rsuIP,
+    DATE(
+        EXTRACT(YEAR FROM TIMESTAMP(srm.metadata.odeReceivedAt) AT TIME ZONE "America/Denver"),
+        EXTRACT(MONTH FROM TIMESTAMP(srm.metadata.odeReceivedAt) AT TIME ZONE "America/Denver"),
+        EXTRACT(DAY FROM TIMESTAMP(srm.metadata.odeReceivedAt) AT TIME ZONE "America/Denver")
+    ) AS localDate,
+    count(1) AS SRM_count
+FROM cdot-adap-prod.raw_from_rtdh_standard.cv_srm_standard
+WHERE srm.metadata.originIp LIKE @Region1
+    AND DATETIME(TIMESTAMP(srm.metadata.odeReceivedAt), \"America/Denver\") BETWEEN @start_date AND @end_date
+GROUP BY localDate, rsuIP
+ORDER BY localDate, rsuIP
+"""
+
+query_params = [ 
+    bigquery.ScalarQueryParameter("Region1", "STRING", '%10.11.81%'), #displays SRM counts by using all RSUs from 10.11.81.## located on Wadsworth Blvd
+    bigquery.ScalarQueryParameter("start_date", "STRING", start), 
+    bigquery.ScalarQueryParameter("end_date", "STRING", end), 
+]
+
+job_config = bigquery.QueryJobConfig()
+job_config.query_parameters = query_params
+
+
+# execute the query
+SRM = client.query(query, job_config=job_config).to_dataframe()
+SRM.head()
+
+startDate = SRM['localDate'].iloc[0]
+endDate = SRM['localDate'].iloc[-1]
+dayCount = endDate - startDate
+totalSRM = SRM['SRM_count'].sum()
+
+print('Date Range: {} to {} \nNumber of Days: {} \nTotal SRMs: {}'.format(startDate, endDate, dayCount, totalSRM))
+
+# Table
+SRMCountTable = pd.pivot(
+    SRM,
+    values='SRM_count',
+    index='localDate',
+    columns='rsuIP').fillna(0)
+
+SRMCountTable.head()
+
+
+# Plot a bar chart using the PivotTable
+ax = SRMCountTable.plot(kind="bar")
+
+fig = ax.get_figure()
+fig.set_size_inches(20, 5)
+
+ax.set_title("SRM Counts by Day", fontweight='bold')
+ax.set_xlabel("Date")
+ax.set_ylabel("SRM Counts")
+plt.show()
