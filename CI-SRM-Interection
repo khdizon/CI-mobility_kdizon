@@ -25,13 +25,14 @@ import seaborn as sns
 import plotly.express as px
 import dateutil as du
 import datetime as dt
+import json
 
 
 # In[2]:
 
 
 # Load Data
-file_path = os.path.join(os.getcwd(), "/Users/Kenny/Downloads/srm_exchange.csv")
+file_path = os.path.join(os.getcwd(), "srm_exchange.csv")
 df = pd.read_csv(file_path)
 
 
@@ -67,36 +68,29 @@ srm_fig2.show()
 import ipyleaflet as ipl
 import ipywidgets as ipw
 
-from ipyleaflet import basemaps, Map,Marker, CircleMarker, AwesomeIcon, LayerGroup, MarkerCluster, Icon
+from ipyleaflet import (basemaps, Map, Marker, CircleMarker, MarkerCluster,
+                        Icon, SearchControl, FullScreenControl, LayerGroup)
+from ipywidgets import (Text, HTML)
 
 
-# In[7]:
+# In[13]:
 
 
-# import tile layer for mapbox
-tileUrl = 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token=pk.eyJ1IjoiZHJld2pqIiwiYSI6ImNrcWtqMGU5YzNlNDgycGxjNmw0NWQ0eGsifQ.jMxZO_Qs38YyYc137cNCew'
-
-# build base tile layer for map
-blayer = ipl.TileLayer(url=tileUrl, base=True, attribution='Mapbox Satellite', max_zoom=22, no_wrap=True)
-
-
-# In[8]:
-
-
-# Define the bounding box 
+# Define the location box
 # Using min/max of geo-location to find the middle
 Bbox_srm = ((df.Lon.min(), df.Lon.max(),
              df.Lat.min(), df.Lat.max()))
-Bbox_srm
-
-
-# In[9]:
-
 
 ### Initial Map Set-Up
 connected_intersection = (Bbox_srm[3], Bbox_srm[0])  #ipyleaflet requires (lat, long) for centering a location
 zoom = 15
 ci = Map(center=connected_intersection, zoom=zoom)
+
+
+# import tile layer for mapbox
+tileUrl = 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token=pk.eyJ1IjoiZHJld2pqIiwiYSI6ImNrcWtqMGU5YzNlNDgycGxjNmw0NWQ0eGsifQ.jMxZO_Qs38YyYc137cNCew'
+# build base tile layer for map
+blayer = ipl.TileLayer(url=tileUrl, base=True, attribution='Mapbox Satellite', max_zoom=22, no_wrap=True)
 
 # insert map tile layer
 ci.add_layer(blayer)
@@ -112,29 +106,12 @@ display(ci)
 # - requestID assign a color value [6 requests]
 # - requestType assign a shape value [request, cancellation]
 # - Inlane Outlane assign a number value [Approach/Exit]
-
-# In[10]:
-
-
 # test marker
-
 srm_start = Marker(location=[df['Lat'].iloc[0], df['Lon'].iloc[0]], draggable=False)
 ci.add_layer(srm_start)
 display(ci)
-
-
-# ##### Dictionary Creation: Holding Markers
-
-# In[11]:
-
-
-stop
-
-
-# In[19]:
-
-
-# Create a dictionary holding references to all markers
+# ### Dictionary Creation: Holding Markers
+### Create a dictionary holding references to all markers
 marker_dict = {}
 
 # Loop through each row in the dataframe
@@ -143,23 +120,8 @@ for index, row in df.iterrows():
     value = (row['Lat'], row['Lon'])
     marker_dict[key] = value
     
-print(marker_dict)
 
-### SHOWS ALL
-
-
-# In[24]:
-
-
-marker_list = []
-for mlist in marker_dict.values():
-    marker_list.extend(mlist)
-
-
-# In[12]:
-
-
-# Create a dictionary holding references to all markers
+### 
 marker_dict = {}
 
 # Loop through each row in the dataframe
@@ -173,27 +135,14 @@ for index, row in df.iterrows():
     else:
         # If it doesn't, create a new list with the latitude and longitude values and add it to the dictionary with the key
         marker_dict[key] = [(lat, lon)]
-
-print(marker_dict)
-
-### SHOWS ALL
-
-
-# In[ ]:
-
-
+        
+### 
 marker_dict = {}
 for i, row in df.iterrows():
     marker_dict[(row['RequestID'], row['MsgCount'])] = [row['Lat'], row['Lon']]
     
-# print(marker_dict)
-
-### SHOWS ALL
-
-
-# In[ ]:
-
-
+    
+###
 marker_dict = {}
 
 # iterate over the rows of the dataframe and add the markers to the dictionary
@@ -202,22 +151,7 @@ for index, row in df.iterrows():
     # add the value
     marker_dict[key] = [row['Lat'], row['Lon']]
 
-# print the markers dictionary
-# print(marker_dict)
-
-# Shows the Key being the RequestID_MsgCount
-# Values are the lat/long
-
-#print(marker_dict.keys())
-#print(marker_dict.values())
-
-
-### SHOWS ONE
-
-
-# In[ ]:
-
-
+###
 marker_dict = {}
 
 # iterate over the rows of the dataframe and add the markers to the dictionary
@@ -227,139 +161,190 @@ for index, row in df.iterrows():
     if key in marker_dict:
         marker_dict[key].append(pos)
     else:
-        marker_dict[key] = [pos]
-        
-### SHOWS ONE
-
-
-# In[ ]:
-
-
-# dictionary keys into a list
+        marker_dict[key] = [pos]# dictionary keys into a list
 srm_reqID = list(marker_dict.keys())
 print(srm_reqID)
 
 #df.RequestID.unique()
+# In[ ]:
 
 
-# ### Trail Run
-
-# In[13]:
+stop
 
 
-print(marker_dict.keys())
-print(marker_dict.values())
+# ### Test Environment
+
+# In[ ]:
 
 
-# In[16]:
 
 
-for key, pos in marker_dict.items():
-    for geo in pos:
-        marker = Marker(location=pos, draggable=False)
-        ci.add_layer(marker)
-ci
 
-# Define function to update the markers based on the selected timemark
-def update_markers(timemark):
-    # create a list to hold the updated markers
-    srm_pos = []
-    for index, row in df.iterrows():
-        # create a key for the current row
-        key = f"{row['RequestID']}_{['MsgCount']}"
-        # calculate time difference between the previous times
-        time_diff = timemark - row['ode_timemark']
-        # if the time difference is positive and less than a certain threshold, create new marker
-        if 0 <= time_diff <= 10:
-            # define markers color based on RequestID
-            if row['RequestID'] %2 == 0:
-                color = 'blue'
-            else:
-                color = 'purple' 
-            # define the markers color based on the PriorityRequestType
-            if row['PriorityRequestType'] == 'priorityRequest':
-                opacity = 1.0
-            else:
-                opacity = 0.5
-        # create the marker
-        marker = ipl.CircleMarker(location=marker_dict, radius=3, color=color, opacity=opacity)
-        srm_pos.append(marker)
-    # create a new layer with the updated markers and add it to the map
-    marker_layer = ipl.LayerGroup(layers=srm_pos)
-    ci.add_layer(marker_layer)
+# # Depolyment Environment
+
+# Version 1
+
+# In[ ]:
+
+
+# Create a dictionary to store markers
+
+marker_dict = {}
+for i, row in df.iterrows():
+    # Assign key as a tuple
+    # Assign value pairs as a list
+    key = (row['RequestID'], row['PriorityRequestType'],
+          row['InLaneID'], row['OutLaneID'], row['ode_timemark'])
+    value = [row['Lat'], row['Lon']]
+    # value is now marker key
+    marker_dict[key] = value
     
-# get min/max times of interchange
-mintm = df['ode_timemark'].min()
-maxtm = df['ode_timemark'].max()
-
-# Create the slider widget
-time_slider = ipw.IntSlider(value=0, min=mintm, max=maxtm, step=1000)
-
-# define the function to udate thje map when the slide is changed
-def on_slider_change(change):
-    update_markers(change.new)
+    # Create a circle marker for each value of srm location
+    srm_marker = ipl.CircleMarker(location=value, radius=3, stroke=False, fill_color='white', fill_opacity=1.0)
     
-# acttach the slider widget to the map
-ipw.jslink((time_slider, 'value'), (map, 'value'))
-
-# add the slider widget to the output area
-ipw.Vbox([time_slider, map])
-# # Test Environment
-
-# In[25]:
-
-
-# Define function to update the markers based on the selected timemark
-def update_markers(timemark):
-    # create a list to hold the updated markers
-    srm_pos = []
-    for index, row in df.iterrows():
-        # create a key for the current row
-        key = row['RequestID']
-        # calculate time difference between the previous times
-        time_diff = timemark - row['ode_timemark']
-        # if the time difference is positive and less than a certain threshold, create new marker
-        if 0 <= time_diff <= 10:
-            # define marker locations
-            location = marker_list
-            # define markers color based on RequestID
-            if row['RequestID'] %2 == 0:
-                color = 'blue'
-            else:
-                color = 'purple' 
-            # define the markers color based on the PriorityRequestType
-            if row['PriorityRequestType'] == 'priorityRequest':
-                opacity = 1.0
-            else:
-                opacity = 0.5
-        # create the marker
-        marker = ipl.CircleMarker(location=location, radius=3, color=color, opacity=opacity)
-        srm_pos.append(marker)
-    # create a new layer with the updated markers and add it to the map
-    marker_layer = ipl.LayerGroup(layers=srm_pos)
-    ci.add_layer(marker_layer)
+    # Remove the key and keep the location  
+    # add the srm_marker element to the end of the list
+    mlist = marker_dict.pop(key, [])
+    mlist.append(srm_marker)
     
-# get min/max times of interchange
-mintm = df['ode_timemark'].min()
-maxtm = df['ode_timemark'].max()
-
-# Create player and the slider widget
-player = ipw.Play(min=mintm, max=maxtm, step=1000, internval=500)
-time_slider = ipw.IntSlider(min=mintm, max=maxtm, step=5)
-
-# define the function to udate thje map when the slide is changed
-def on_slider_change(change):
-    update_markers(change.new)
-    
-# acttach the slider widget to the map
-ipw.jslink((player, 'value'), (time_slider, 'value'))
-
-# add the slider widget to the output area
-ipw.VBox([player, time_slider])
+    # Update/Input the created dictionary with all values
+    m_dict = dict([(key, mlist)])
+    marker_dict.update(m_dict)
 
 
 # In[ ]:
 
 
-mintm, maxtm 
+# Create a list using the dictionary values
+marker_list = []
+
+
+
+for mlist in marker_dict.values():
+    marker_list.extend(mlist)
+
+
+# Version 2
+
+# In[ ]:
+
+
+# Create a dictionary to hold all latitudes and longitudes as values and use the RequestID column as keys
+locations_dict = {}
+for i, row in df.iterrows():
+    location = (row['Lat'], row['Lon'])
+    key = row['RequestID']
+    if key in locations_dict:
+        locations_dict[key].append(location)
+    else:
+        locations_dict[key] = [location]
+        
+# Create a dictionary to hold all markers as values and use the RequestID column as keys
+markers_dict = {}
+for key, locations in locations_dict.items():
+    markers = []
+    for location in locations:
+        marker = CircleMarker(location=location, draggable=False)
+        markers.append(marker)
+    markers_dict[key] = markers
+
+
+# Version 3
+
+# In[21]:
+
+
+# First, we will create a dictionary to hold references of all latitude and longitude values, 
+# and assign the dictionary key by combining the unique RequestID and MessageNumber columns:
+marker_dict = {}
+for index, row in df.iterrows():
+    key = str(row['RequestID']) + '_' + str(row['MsgCount'])
+    value = (row['Lat'], row['Lon'])
+    marker_dict[key] = value
+
+
+# In[22]:
+
+
+# create a function that returns a CircleMarker for a given 
+# latitude, longitude, color, and opacity:
+def create_marker(lat, lon, color, opacity):
+    marker = CircleMarker(location=(lat, lon), radius=3, weight=1, color=color, opacity=opacity)
+    return marker
+
+
+# In[23]:
+
+
+# function that updates the marker color and opacity based on the RequestID and RequestType columns:
+def update_marker(marker, RequestID, RequestType):
+    colors = ['#bb0fd6', '#1ce6e2']
+    color = colors[RequestID % len(colors)]
+    fill = '#1B6EF7' if RequestType == 'priorityRequest' else '#F3F00A'
+    
+    marker.color = color
+    marker.fill_color = fill
+    
+#     opacity = 0.5 if RequestType == 'priorityRequest' else 1.0
+#     marker.opacity = opacity
+
+
+# In[24]:
+
+
+# function that generates a list of CircleMarkers in order of the 'timemark' column:
+def generate_markers():
+    markers = []
+    for index, row in df.sort_values('ode_timemark').iterrows():
+        key = str(row['RequestID']) + '_' + str(row['MsgCount'])
+        lat, lon = marker_dict[key]
+        color = '#FFFFFF'
+        opacity = 0.0
+        marker = create_marker(lat, lon, color, opacity)
+        update_marker(marker, row['RequestID'], row['PriorityRequestType'])
+        markers.append(marker)
+    return markers
+
+
+# In[27]:
+
+
+# get min/max times of interchange
+mintm = df['ode_timemark'].min()
+maxtm = df['ode_timemark'].max()
+
+# Finally, we will create the ipywidgets and ipyleaflet objects 
+# and combine them to create an animated trail of CircleMarkers:
+
+markers = generate_markers()
+
+cluster = MarkerCluster(markers=markers)
+layer_group = LayerGroup(layers=[cluster])
+ci.add_layer(layer_group)
+
+
+# Create player and the slider widget
+player = ipw.Play(value=0, min=mintm, max=maxtm, step=1000, interval=500, description="Play")
+slider = ipw.IntSlider(min=mintm, max=maxtm, step=5, description="Time")
+ipw.jslink((player, 'value'), (slider, 'value'))
+
+# define the function to update the map when the slide changes
+def update_marker_layer(change):
+    layer_group.clear_layers()
+    layer_group.add_layer(MarkerCluster(markers=markers[:change['new']+1]))
+
+slider.observe(update_marker_layer, 'value')
+
+output1 = ipw.Output()
+with output1:
+    display(ci)
+
+# add the slider widget to the output area 
+display(ipw.VBox([ipw.HBox([player, slider]), output1]))
+
+
+# In[ ]:
+
+
+
 
