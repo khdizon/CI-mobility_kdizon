@@ -1,2 +1,40 @@
 # CI Signal Status Message
 
+-- # Select Desired Date from SRM Counts
+-- starttime = '2023-01-03 00:01:00.000000'
+-- endtime = '2023-01-03 23:59:00.000000'
+-- # Using Region 1: Corridor Intersection Details
+-- intID = 12113 
+
+%%time
+
+query = 
+""""
+SELECT 
+ssm.metadata.odeReceivedAt AS ode_timestamp,
+ssm.metadata.originIp AS rsuIP,
+--
+signalStatus.id.id AS IntersectionID,
+signalStatusPackage.requester.id.entityID AS RequestID,
+ssm.payload.data.sequenceNumber AS MsgCount,
+signalStatusPackage.status AS PriorityResponseStatus,
+signalStatusPackage.inboundOn.lane AS InLaneID,
+signalStatusPackage.outboundOn.lane AS OutLaneID
+FROM 
+  cdot-adap-prod.raw_from_rtdh_standard.cv_ssm_standard,
+  UNNEST(ssm.payload.data.status.signalStatus) AS signalStatus,
+  UNNEST(signalStatus.sigStatus.signalStatusPackage) AS signalStatusPackage
+WHERE
+  SignalRequestsList.request.id.id = @intersection_ID,
+  AND DATETIME(TIMESTAMP(ssm.metadata.odeReceivedAt), \"America/Denver\") BETWEEN @start_time AND @end_time
+ORDER BY ode_timestamp
+""")
+
+query_params = [ 
+    bigquery.ScalarQueryParameter("intersection_ID", "INT64", intID),
+    bigquery.ScalarQueryParameter("start_time", "STRING", starttime),
+    bigquery.ScalarQueryParameter("end_time", "STRING", endtime)
+]
+
+job_config = bigquery.QueryJobConfig()
+job_config.query_parameters = query_params
