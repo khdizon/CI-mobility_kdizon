@@ -1,0 +1,96 @@
+# First, we will create a dictionary to hold references of all latitude and longitude values, 
+# and assign the dictionary key by combining the unique RequestID and MessageNumber columns:
+marker_dict = {}
+for index, row in srm.iterrows():
+    key = str(row['RequestID']) + '_' + str(row['MsgCount'])
+    value = (row['Lat'], row['Lon'])
+    marker_dict[key] = value
+    
+print(marker_dict)
+#print(marker_ref.keys())
+#print(marker_ref.values())
+
+# create a function that returns a CircleMarker for a given 
+# latitude, longitude, color, and opacity:
+def create_marker(lat, lon, color, opacity):
+    marker = CircleMarker(location=(lat, lon), radius=3, color=color, opacity=opacity)
+    return marker
+    
+    # function that updates the marker color and opacity based on the RequestID and RequestType columns:
+def update_marker(marker, RequestID, RequestType):
+    colors = ['#bb0fd6', '#1ce6e2']
+    color = colors[RequestID % len(colors)]
+    fill = '#1B6EF7' if RequestType == 'priorityRequest' else '#F3F00A'
+    marker.color = color
+    marker.fill_color = fill
+    
+    
+    ### ANIMATION ###
+    
+   # function that generates a list of CircleMarkers in order of the 'timemark' column:
+def generate_markers():
+    markers = []
+    for index, row in srm.sort_values('ode_timemark').iterrows():
+        key = str(row['RequestID']) + '_' + str(row['MsgCount'])
+        lat, lon = marker_dict[key]
+        color = '#FFFFFF'
+        opacity = 0.0
+        marker = create_marker(lat, lon, color, opacity)
+        update_marker(marker, row['RequestID'], row['PriorityRequestType'])
+        markers.append(marker)
+    return markers
+    
+# function that generates a list of CircleMarkers in order of the 'timemark' column:
+def generate_markers():
+    markers = []
+    for index, row in srm.sort_values('ode_timemark').iterrows():
+        key = str(row['RequestID']) + '_' + str(row['MsgCount'])
+        lat, lon = marker_dict[key]
+        color = '#FFFFFF'
+        opacity = 0.0
+        marker = create_marker(lat, lon, color, opacity)
+        update_marker(marker, row['RequestID'], row['PriorityRequestType'])
+        markers.append(marker)
+    return markers
+    
+    ### New Map Set-Up
+ci2 = Map(center=connected_intersection, zoom=15,
+         layout=ipw.Layout(width='70%', height='600px'))
+# insert map tile layer
+ci2.add_layer(blayer)
+# show map
+#display(ci2)
+
+# get min/max times of interchange
+mintm = srm['ode_timemark'].min()
+maxtm = srm['ode_timemark'].max()
+
+# Finally, we will create the ipywidgets and ipyleaflet objects 
+# and combine them to create an animated trail of CircleMarkers:
+
+markers = generate_markers()
+
+cluster = MarkerCluster(markers=markers)
+layer_group = LayerGroup(layers=[cluster])
+ci2.add_layer(layer_group)
+
+
+# Create player and the slider widget
+player = ipw.Play(value=0, min=mintm, max=maxtm, step=100, interval=1, description="Play")
+slider = ipw.IntSlider(min=mintm, max=maxtm, step=5, description="Time")
+ipw.jslink((player, 'value'), (slider, 'value'))
+
+# define the function to update the map when the slide changes
+def update_marker_layer(change):
+    layer_group.clear_layers()
+    layer_group.add_layer(MarkerCluster(markers=markers[:change['new']+1]))
+
+slider.observe(update_marker_layer, 'value')
+
+output1 = ipw.Output()
+with output1:
+    display(ci2)
+
+# add the slider widget to the output area 
+display(ipw.VBox([ipw.HBox([player, slider]), output1]))
+    
