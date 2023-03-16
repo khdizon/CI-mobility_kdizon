@@ -94,3 +94,92 @@ with output1:
 # add the slider widget to the output area 
 display(ipw.VBox([ipw.HBox([player, slider]), output1]))
     
+
+
+
+### Version 2 ###
+# Define the bounding box 
+# Using min/max of geo-location to find the middle
+Bbox_srm = ((srm.Lon.min(), srm.Lon.max(),
+             srm.Lat.min(), srm.Lat.max()))
+Bbox_srm
+
+### Initial Map Set-Up
+connected_intersection = (Bbox_srm[3], Bbox_srm[0])  #ipyleaflet requires (lat, long) for centering a location
+zoom = 15
+ci = Map(center=connected_intersection, zoom=zoom)
+
+# import tile layer for mapbox
+tileUrl = 'https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.jpg90?access_token=pk.eyJ1IjoiZHJld2pqIiwiYSI6ImNrcWtqMGU5YzNlNDgycGxjNmw0NWQ0eGsifQ.jMxZO_Qs38YyYc137cNCew'
+
+# build base tile layer for map
+blayer = ipl.TileLayer(url=tileUrl, base=True, attribution='Mapbox Satellite', max_zoom=22, no_wrap=True)
+
+# insert map tile layer
+ci.add_layer(blayer)
+
+# show map
+display(ci)
+
+### New Map Set-Up
+ci2 = Map(center=connected_intersection, zoom=15,
+         layout=ipw.Layout(width='70%', height='600px'))
+ci2.add_layer(blayer)
+# show map
+#display(ci2)
+
+markers = {}
+for _, row in df.iterrows():
+    markers[(row['RequestID'], row['MsgCount'])] = (row['Lat'], row['Lon'])
+
+color_map = {118: '#0000FF', 119: '#4B0082', 120: '#C71585',
+             121: '#FF4500', 122: '#FF8000', 123: '#FFFF00'}
+    
+# Create circle markers
+for _, row in srm.iterrows():
+    circle = ipl.CircleMarker(
+        location=(row['Lat'], row['Lon']),
+        radius=3,
+        color=color_map[row['RequestID']],
+        opacity=1.0 if row['PriorityRequestType'] == 'priorityRequest' else 0.3
+    )
+    markers[(row['RequestID'], row['MsgCount'])] = circle
+    ci.add_layer(circle)
+    
+# Create function to update marker position
+def update_marker_position(timemark):
+    for _, row in srm.iterrows():
+        if row['ode_timemark'] <= timemark:
+            circle = markers[(row['RequestID'], row['MsgCount'])]
+            circle.location = (row['Lat'], row['Lon'])
+
+# get min/max times of interchange
+mintm = srm['ode_timemark'].min()
+maxtm = srm['ode_timemark'].max()
+print(mintm,'-', maxtm)
+
+# create player and slider to adjust speed
+player = ipw.Play(min=mintm, max=maxtm, step=100, interval=1, description="Play")
+slider = ipw.IntSlider(min=mintm, max=maxtm, step=5, description="Time")
+
+# Create function to create and remove markers
+def update_map(timemark):
+    for _, row in srm.iterrows():
+        if row['ode_timemark'] <= timemark:
+            if markers[(row['RequestID'], row['MsgCount'])] not in ci.layers:
+                ci.add_layer(markers[(row['RequestID'], row['MsgCount'])])
+        else:
+            if markers[(row['RequestID'], row['MsgCount'])] in ci.layers:
+                ci.remove_layer(markers[(row['RequestID'], row['MsgCount'])])
+
+ipw.jslink((player, 'value'), (slider, 'value'))
+player.observe(lambda event: update_map(event['new']), names='value')
+
+output1 = ipw.Output()
+with output1:
+    display(ci)
+
+# add the slider widget to the output area 
+display(ipw.VBox([ipw.HBox([player, slider]), output1]))
+     
+
