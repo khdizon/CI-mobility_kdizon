@@ -1,2 +1,2 @@
 # Connected_Intersections_Study
-CI Transportration Fellowship
+Connected Intersection Transportration Fellowship @CDOT
